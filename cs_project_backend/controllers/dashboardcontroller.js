@@ -3,7 +3,7 @@ import AssignmentModel from "../models/assignment_model.js";
 import NoticeModel from "../models/notice_model.js";
 import ComplaintModel from "../models/complaint_model.js";
 
-// Placeholder ID for actions where authentication is intentionally skipped (must be a valid Mongoose ObjectId format)
+// Placeholder ID for actions where authentication is intentionally skipped
 const ANONYMOUS_ID = '000000000000000000000001'; 
 
 
@@ -47,6 +47,7 @@ export const redirectToDashboard = async (req,res) => {
 // STUDENT CRUD API (NO AUTH)
 // -----------------------------------------------------------------
 
+// READ: Get All Students
 export const getStudents = async (req, res) => {
     try {
         const students = await StudentModel.find().select('_id name email phone rollNumber age department image number enrollmentId course'); 
@@ -57,6 +58,27 @@ export const getStudents = async (req, res) => {
     }
 };
 
+// READ: Get Single Student by ID
+export const getStudentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const student = await StudentModel.findById(id).select('-password'); 
+        
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found.' });
+        }
+
+        const studentData = mapStudentToFlutter(student); 
+
+        return res.status(200).json(studentData);
+    } catch (error) {
+        console.error("Error fetching student by ID:", error);
+        return res.status(500).json({ message: 'Failed to fetch student data.', error: error.message });
+    }
+};
+
+// CREATE: Add Student
 export const addStudent = async (req, res) => {
     try {
         const studentData = req.body; 
@@ -80,27 +102,21 @@ export const addStudent = async (req, res) => {
     }
 };
 
+// UPDATE: Update Student
 export const updateStudent = async (req, res) => {
     try {
         const { id } = req.params; 
         const studentData = req.body; 
-        
-        // --- FIX BEGINS HERE ---
-        // 1. Ensure studentData is a valid object. If req.body is empty, stop early.
+
+        // Reverting the name fix and using the original, simpler implementation
         if (!studentData || Object.keys(studentData).length === 0) {
              return res.status(400).json({ message: 'Request body cannot be empty for update.' });
         }
         
-        let updates = { ...studentData };
-        
-        // 2. Safe Name Check (use studentData? to prevent crash if req.body failed to parse, though unlikely)
-        if (studentData.name) {
-            updates.name = studentData.name;
-        }
-
+        // Using studentData directly, which was the original code before complex fixes
         const updatedStudent = await StudentModel.findByIdAndUpdate(
             id,
-            updates, 
+            studentData, 
             { new: true, runValidators: true } 
         );
 
@@ -108,7 +124,7 @@ export const updateStudent = async (req, res) => {
             return res.status(404).json({ message: 'Student not found.' });
         }
         
-        // CRITICAL FIX: Use .toObject() to ensure properties are accessible
+        // Ensure properties are accessible for mapping
         const studentObject = updatedStudent.toObject ? updatedStudent.toObject() : updatedStudent;
 
         return res.status(200).json({
@@ -125,6 +141,7 @@ export const updateStudent = async (req, res) => {
     }
 };
 
+// DELETE: Delete Student
 export const deleteStudent = async (req, res) => {
     try {
         const { id } = req.params; 
@@ -196,7 +213,7 @@ export const createNotice = async (req, res) => {
 };
 
 
-export const getNotices = async (req, res) => {
+export const getNotices = async (req, res) => { // ADDED 'export' KEYWORD HERE
     try {
         const notices = await NoticeModel.find()
             .sort({ date: -1, createdAt: -1 }) 
@@ -221,7 +238,7 @@ export const getNotices = async (req, res) => {
 // COMPLAINT API (NO AUTH)
 // -----------------------------------------------------------------
 
-export const submitComplaint = async (req, res) => {
+export const submitComplaint = async (req, res) => { // ADDED 'export' KEYWORD HERE
     try {
         const { content, filedByUserId } = req.body; 
         

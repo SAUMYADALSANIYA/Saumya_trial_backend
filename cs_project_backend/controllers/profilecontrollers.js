@@ -4,6 +4,9 @@ import UserModel from "../models/user_model.js";
 import CourseModel from "../models/course_model.js"; 
 import ScheduleModel from "../models/schedule_model.js"; 
 
+// Placeholder ID for actions where authentication is intentionally skipped
+const ANONYMOUS_ID = '000000000000000000000001'; 
+
 
 // -----------------------------------------------------------------
 // UTILITY: Map Faculty data to Flutter's expected structure
@@ -22,13 +25,14 @@ const mapFacultyToFlutter = (faculty) => ({
 
 
 // -----------------------------------------------------------------
-// FACULTY PROFILE MANAGEMENT (Auth Required)
+// FACULTY PROFILE MANAGEMENT (Role 1 & Admin POST)
 // -----------------------------------------------------------------
 
+// GET /api/v1/profile/faculty (Requires Auth)
 export const getMyFacultyProfile = async (req, res) => {
     try {
         const faculty = await FacultyModel.findOne({ user: req.user._id });
-        
+        // ... (rest of the logic)
         if (!faculty) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
         }
@@ -39,28 +43,48 @@ export const getMyFacultyProfile = async (req, res) => {
     }
 };
 
+// POST /dashboard/faculty (Admin Add) OR POST/PUT /profile/faculty (Self Update)
 export const updateOrCreateFacultyProfile = async (req, res) => {
     try {
-        const userId = req.user._id;
+        // FIX: Use req.user?._id for self-update, otherwise use placeholder for Admin creation
+        // Note: For Admin POST, we use the ANONYMOUS_ID placeholder.
+        const userId = req.user ? req.user._id : ANONYMOUS_ID; 
         const facultyData = req.body;
         
-        let faculty = await FacultyModel.findOne({ user: userId });
-        let isNew = !faculty;
-        // ... (rest of the logic remains unchanged, relies on req.user)
+        let faculty;
+        let isNew = true;
+
+        if (req.user) {
+            // If authenticated, we check for an existing profile linked to the user.
+            faculty = await FacultyModel.findOne({ user: userId });
+            isNew = !faculty;
+        } 
+        
+        // If we are adding via Admin (req.user is undefined), we force creation logic.
+        if (!req.user && facultyData.facultyId) {
+             // If Admin is posting, check if the Faculty ID already exists as a profile
+             const existing = await FacultyModel.findOne({ facultyId: facultyData.facultyId });
+             if(existing) {
+                // If the Admin POSTs a profile that already exists, treat it as an unauthorized duplicate POST.
+                 return res.status(400).json({ message: `Faculty profile with ID ${facultyData.facultyId} already exists.` });
+             }
+        }
         
         const dataToSave = {
             ...facultyData,
-            user: userId,
+            user: userId, // Link to the placeholder ID
             profilestatus: true, 
         };
         
         if (isNew) {
+            // CREATE NEW PROFILE (Happens during Admin POST or first Faculty self-POST)
             faculty = await FacultyModel.create(dataToSave); 
             return res.status(201).json({ 
                 message: 'Profile created successfully.',
                 faculty: mapFacultyToFlutter(faculty)
             });
         } else {
+            // UPDATE EXISTING PROFILE (Happens during Faculty self-PUT)
             faculty = await FacultyModel.findByIdAndUpdate(
                 faculty._id,
                 dataToSave,
@@ -89,7 +113,6 @@ export const studentdetail = async (req,res)=>{
     try{
        const {enrollmentId,course,DOB,Gender,Year,Nationality,Religion,State} = req.body;
        const existing = await StudentModel.findOne({user: req.user._id});
-        // ... (rest of the logic remains unchanged, relies on req.user)
        
        if(existing){
         return res.status(400).json({message: "Student profile already exists"});
@@ -157,7 +180,6 @@ export const adminUpdateFaculty = async (req, res) => {
         if (!updatedFaculty) {
             return res.status(404).json({ message: 'Faculty member not found.' });
         }
-        // ... (rest of the logic remains unchanged)
         
         return res.status(200).json({ 
             message: 'Faculty profile updated successfully by Admin.',
@@ -191,7 +213,7 @@ export const getFacultyDashboardData = async (req, res) => {
         
         // 1. Find the Faculty Profile linked to that userId
         const facultyProfile = await FacultyModel.findOne({ user: userId })
-            .select('_id name department subject facultyId courseTeaching user'); // Include user field for linking
+            .select('_id name department subject facultyId courseTeaching user'); 
         
         if (!facultyProfile) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
