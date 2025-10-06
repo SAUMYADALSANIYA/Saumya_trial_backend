@@ -3,6 +3,10 @@ import AssignmentModel from "../models/assignment_model.js";
 import NoticeModel from "../models/notice_model.js";
 import ComplaintModel from "../models/complaint_model.js";
 
+// Placeholder ID for actions where authentication is intentionally skipped (must be a valid Mongoose ObjectId format)
+const ANONYMOUS_ID = '000000000000000000000001'; 
+
+
 // --- UTILITY: Map Student data to Flutter's expected structure ---
 const mapStudentToFlutter = (s) => ({
     _id: s._id,
@@ -10,14 +14,13 @@ const mapStudentToFlutter = (s) => ({
     email: s.email,
     phone: s.phone || s.number, 
     rollNumber: s.rollNumber || s.enrollmentId,
-    image: s.image,
     age: s.age || 'N/A',
     department: s.department || s.course || 'N/A',
 });
 
 
 // -----------------------------------------------------------------
-// REDIRECTION (Your Existing Logic)
+// REDIRECTION (Auth Required)
 // -----------------------------------------------------------------
 
 export const redirectToDashboard = async (req,res) => {
@@ -41,14 +44,12 @@ export const redirectToDashboard = async (req,res) => {
 
 
 // -----------------------------------------------------------------
-// STUDENT CRUD API (ADMIN)
+// STUDENT CRUD API (NO AUTH)
 // -----------------------------------------------------------------
 
-// GET /api/v1/dashboard/students 
 export const getStudents = async (req, res) => {
     try {
         const students = await StudentModel.find().select('_id name email phone rollNumber age department image number enrollmentId course'); 
-        
         return res.status(200).json(students.map(mapStudentToFlutter)); 
     } catch (error) {
         console.error("Error fetching students:", error);
@@ -56,7 +57,6 @@ export const getStudents = async (req, res) => {
     }
 };
 
-// POST /api/v1/dashboard/student 
 export const addStudent = async (req, res) => {
     try {
         const studentData = req.body; 
@@ -80,37 +80,51 @@ export const addStudent = async (req, res) => {
     }
 };
 
-// PUT /api/v1/dashboard/student/:id 
 export const updateStudent = async (req, res) => {
     try {
         const { id } = req.params; 
         const studentData = req.body; 
+        
+        // --- FIX BEGINS HERE ---
+        // 1. Ensure studentData is a valid object. If req.body is empty, stop early.
+        if (!studentData || Object.keys(studentData).length === 0) {
+             return res.status(400).json({ message: 'Request body cannot be empty for update.' });
+        }
+        
+        let updates = { ...studentData };
+        
+        // 2. Safe Name Check (use studentData? to prevent crash if req.body failed to parse, though unlikely)
+        if (studentData.name) {
+            updates.name = studentData.name;
+        }
 
         const updatedStudent = await StudentModel.findByIdAndUpdate(
             id,
-            studentData,
+            updates, 
             { new: true, runValidators: true } 
         );
 
         if (!updatedStudent) {
             return res.status(404).json({ message: 'Student not found.' });
         }
+        
+        // CRITICAL FIX: Use .toObject() to ensure properties are accessible
+        const studentObject = updatedStudent.toObject ? updatedStudent.toObject() : updatedStudent;
 
         return res.status(200).json({
             message: 'Student updated successfully',
-            student: mapStudentToFlutter(updatedStudent)
+            student: mapStudentToFlutter(studentObject)
         });
 
     } catch (error) {
         if (error.code === 11000) {
              return res.status(400).json({ message: `A student with this roll number or email already exists.` });
         }
-        console.error("Error updating student:", error);
+        console.error("Error updating student:", error); 
         return res.status(500).json({ message: 'Failed to update student', error: error.message });
     }
 };
 
-// DELETE /api/v1/dashboard/student/:id
 export const deleteStudent = async (req, res) => {
     try {
         const { id } = req.params; 
@@ -132,13 +146,13 @@ export const deleteStudent = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// ASSIGNMENT & NOTICE APIs
+// ASSIGNMENT & NOTICE APIs (NO AUTH)
 // -----------------------------------------------------------------
 
-// POST /api/v1/dashboard/assignment
 export const createAssignment = async (req, res) => {
     try {
-        const createdBy = req.user._id; 
+        // Use placeholder ID since req.user is absent
+        const createdBy = ANONYMOUS_ID; 
         const { title, description, due_date } = req.body;
 
         const newAssignment = await AssignmentModel.create({
@@ -152,17 +166,16 @@ export const createAssignment = async (req, res) => {
             message: 'Assignment created successfully',
             assignment: newAssignment
         });
-
     } catch (error) {
         console.error("Error creating assignment:", error);
         return res.status(500).json({ message: 'Failed to create assignment', error: error.message });
     }
 };
 
-// POST /api/v1/dashboard/notice
 export const createNotice = async (req, res) => {
     try {
-        const createdBy = req.user._id; 
+        // Use placeholder ID since req.user is absent
+        const createdBy = ANONYMOUS_ID; 
         const { title, description, date } = req.body;
 
         const newNotice = await NoticeModel.create({
@@ -183,7 +196,6 @@ export const createNotice = async (req, res) => {
 };
 
 
-// GET /api/v1/dashboard/notices 
 export const getNotices = async (req, res) => {
     try {
         const notices = await NoticeModel.find()
@@ -202,25 +214,26 @@ export const getNotices = async (req, res) => {
         console.error("Error fetching notices:", error);
         return res.status(500).json({ message: 'Failed to fetch notices', error: error.message });
     }
-    
 };
 
 
 // -----------------------------------------------------------------
-// COMPLAINT API (General Access)
+// COMPLAINT API (NO AUTH)
 // -----------------------------------------------------------------
 
-// POST /api/v1/dashboard/complaint
 export const submitComplaint = async (req, res) => {
     try {
-        const { content } = req.body;
-        const userId = req.user._id;
-        const userRole = req.user.role; 
-
-        let modelName;
-        if (userRole === 1) modelName = 'Faculty';
-        else if (userRole === 0) modelName = 'Student';
-        else modelName = 'Admin'; 
+        const { content, filedByUserId } = req.body; 
+        
+        // Rely on client to send a userId for linking, or use ANONYMOUS_ID
+        const userId = filedByUserId || ANONYMOUS_ID; 
+        
+        // Default to Admin/Anonymous model name
+        let modelName = 'Admin'; 
+        
+        if (!content) {
+            return res.status(400).json({ message: 'Complaint content is required.' });
+        }
 
         const newComplaint = await ComplaintModel.create({
             content,

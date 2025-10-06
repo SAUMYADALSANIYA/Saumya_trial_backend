@@ -18,11 +18,6 @@ const noticeSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Admin', // Assuming Admin creates notices
         required: true,
-    },
-    audience: {
-        type: String,
-        enum: ['All', 'Students', 'Faculty'],
-        default: 'All',
     }
 }, {
     timestamps: true 

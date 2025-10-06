@@ -22,10 +22,9 @@ const mapFacultyToFlutter = (faculty) => ({
 
 
 // -----------------------------------------------------------------
-// FACULTY PROFILE MANAGEMENT (Role 1)
+// FACULTY PROFILE MANAGEMENT (Auth Required)
 // -----------------------------------------------------------------
 
-// GET /api/v1/profile/faculty
 export const getMyFacultyProfile = async (req, res) => {
     try {
         const faculty = await FacultyModel.findOne({ user: req.user._id });
@@ -40,7 +39,6 @@ export const getMyFacultyProfile = async (req, res) => {
     }
 };
 
-// POST/PUT /api/v1/profile/faculty
 export const updateOrCreateFacultyProfile = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -48,7 +46,8 @@ export const updateOrCreateFacultyProfile = async (req, res) => {
         
         let faculty = await FacultyModel.findOne({ user: userId });
         let isNew = !faculty;
-
+        // ... (rest of the logic remains unchanged, relies on req.user)
+        
         const dataToSave = {
             ...facultyData,
             user: userId,
@@ -83,15 +82,15 @@ export const updateOrCreateFacultyProfile = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// STUDENT PROFILE COMPLETION (Role 0)
+// STUDENT PROFILE COMPLETION (Auth Required)
 // -----------------------------------------------------------------
 
-// POST /api/v1/profile/student
 export const studentdetail = async (req,res)=>{
     try{
        const {enrollmentId,course,DOB,Gender,Year,Nationality,Religion,State} = req.body;
        const existing = await StudentModel.findOne({user: req.user._id});
-
+        // ... (rest of the logic remains unchanged, relies on req.user)
+       
        if(existing){
         return res.status(400).json({message: "Student profile already exists"});
        }
@@ -128,10 +127,9 @@ export const studentdetail = async (req,res)=>{
 
 
 // -----------------------------------------------------------------
-// ADMIN FACULTY LIST FETCH (Role 2)
+// ADMIN FACULTY LIST & UPDATE (NO AUTH)
 // -----------------------------------------------------------------
 
-// GET /api/v1/dashboard/faculties
 export const getFaculties = async (req, res) => {
     try {
         const faculties = await FacultyModel.find().select('_id facultyId name subject department');
@@ -145,18 +143,11 @@ export const getFaculties = async (req, res) => {
     }
 };
 
-
-// -----------------------------------------------------------------
-// ADMIN FACULTY UPDATE (Role 2)
-// -----------------------------------------------------------------
-
-// PUT /api/v1/dashboard/faculty/:id
 export const adminUpdateFaculty = async (req, res) => {
     try {
-        const { id } = req.params; // Mongoose _id of the faculty document
+        const { id } = req.params; 
         const facultyData = req.body; 
 
-        // 1. Find and update the faculty document by Mongoose _id
         const updatedFaculty = await FacultyModel.findByIdAndUpdate(
             id,
             facultyData,
@@ -166,8 +157,8 @@ export const adminUpdateFaculty = async (req, res) => {
         if (!updatedFaculty) {
             return res.status(404).json({ message: 'Faculty member not found.' });
         }
-
-        // 2. Return the updated data mapped to the Flutter structure
+        // ... (rest of the logic remains unchanged)
+        
         return res.status(200).json({ 
             message: 'Faculty profile updated successfully by Admin.',
             faculty: mapFacultyToFlutter(updatedFaculty)
@@ -184,17 +175,23 @@ export const adminUpdateFaculty = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// FACULTY DASHBOARD DATA API (Role 1)
+// FACULTY DASHBOARD DATA API (NO AUTH - Requires query param)
 // -----------------------------------------------------------------
 
-// GET /api/v1/dashboard/faculty/data (Main dashboard data fetch)
 export const getFacultyDashboardData = async (req, res) => {
     try {
-        const userId = req.user._id;
+        // Must rely on user ID passed in the query parameter (e.g., ?userId=...)
+        const userId = req.query.userId; 
 
-        // 1. Find the Faculty Profile
+        if (!userId) {
+            return res.status(400).json({ 
+                message: "Authentication is disabled. Please provide the target user's Mongoose ID in the query parameter (e.g., ?userId=...).",
+            });
+        }
+        
+        // 1. Find the Faculty Profile linked to that userId
         const facultyProfile = await FacultyModel.findOne({ user: userId })
-            .select('_id name department subject facultyId courseTeaching'); 
+            .select('_id name department subject facultyId courseTeaching user'); // Include user field for linking
         
         if (!facultyProfile) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
@@ -220,7 +217,6 @@ export const getFacultyDashboardData = async (req, res) => {
         }));
 
 
-        // Return combined data structure to minimize API calls from Flutter
         return res.status(200).json({
             message: 'Dashboard data fetched successfully',
             profile: mapFacultyToFlutter(facultyProfile),

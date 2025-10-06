@@ -96,13 +96,15 @@ const StudentSchema = new mongoose.Schema({
 });
 
 StudentSchema.pre('save',async function (next){
+    // This hook is designed to sync email/number on initial user association.
+    // It must NOT sync the name field, as the name is modifiable by the Admin.
     if(!this.isModified('user')) return next();
     
     const user = await user_model.findById(this.user);
     if(!user) return next(new Error('User not found'));
 
     this.email = user.email;
-    this.name = user.name;
+    // this.name = user.name; <--- THIS LINE HAS BEEN REMOVED/SKIPPED TO ALLOW ADMIN UPDATES
     this.number = user.number;
 
     next();
