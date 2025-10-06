@@ -17,9 +17,19 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
-app.use("/api/v1/auth",authRoutes);
-app.use("/api/v1",dashboardroutes);
-app.use("/api/v1",profileRoutes);
+// -------------------------------------------------------------
+// CORRECT ROUTE MOUNTING
+// -------------------------------------------------------------
+
+// AUTH: /api/v1/auth
+app.use("/api/v1/auth", authRoutes);
+
+// DASHBOARD: Mounted correctly under /api/v1/dashboard (The Fix)
+app.use("/api/v1/dashboard", dashboardroutes);
+
+// PROFILE: /api/v1/profile
+app.use("/api/v1/profile", profileRoutes);
+
 
 app.get("/", (req, res) => {
     res.send("<h1> Welcome To Your Testing Platform </h1>");
