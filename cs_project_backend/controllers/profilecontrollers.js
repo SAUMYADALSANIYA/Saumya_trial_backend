@@ -1,16 +1,11 @@
+import student_model from "../models/student_model.js";
+import user_model from "../models/user_model.js";
 import FacultyModel from "../models/faculty_model.js";
 import StudentModel from "../models/student_model.js";
 import UserModel from "../models/user_model.js";
 import CourseModel from "../models/course_model.js"; 
 import ScheduleModel from "../models/schedule_model.js"; 
 
-// Placeholder ID for actions where authentication is intentionally skipped
-const ANONYMOUS_ID = '000000000000000000000001'; 
-
-
-// -----------------------------------------------------------------
-// UTILITY: Map Faculty data to Flutter's expected structure
-// -----------------------------------------------------------------
 const mapFacultyToFlutter = (faculty) => ({
     _id: faculty._id,
     id: faculty.facultyId, 
@@ -23,16 +18,56 @@ const mapFacultyToFlutter = (faculty) => ({
     qualification: faculty.qualification,
 });
 
+const studentdetail = async (req,res)=>{
+    try{
+       const {enrollmentId,course,DOB,Gender,Year,Nationality,Religion,State} = req.body;
+       const existing = await student_model.findOne({user: req.user._id});
+
+       if(existing){
+        return res.status(400).json({message: "Student profile already exists"});
+       }
+
+        const user = await user_model.findById(req.user._id);
+        if(!user){
+            return res.status(404).json({message: "User not found"});
+        }
+
+       const Student = new student_model({
+        user: user._id,
+        email: user.email,
+        name: user.name,
+        number : user.number,
+        enrollmentId,
+        course,
+        DOB,
+        Gender,
+        Year,
+        Nationality,
+        Religion,
+        State,
+        profilestatus: true
+       });
+       await Student.save();
+
+       return res.status(201).send({success: true, message: 'Student profile saved',data: Student
+});
+    }
+    catch(error){
+        res.json({success: false, error});
+    }
+};
+
+export default studentdetail;
+
 
 // -----------------------------------------------------------------
-// FACULTY PROFILE MANAGEMENT (Role 1 & Admin POST)
+// FACULTY PROFILE MANAGEMENT (Auth Required)
 // -----------------------------------------------------------------
 
-// GET /api/v1/profile/faculty (Requires Auth)
 export const getMyFacultyProfile = async (req, res) => {
     try {
         const faculty = await FacultyModel.findOne({ user: req.user._id });
-        // ... (rest of the logic)
+        
         if (!faculty) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
         }
@@ -43,48 +78,27 @@ export const getMyFacultyProfile = async (req, res) => {
     }
 };
 
-// POST /dashboard/faculty (Admin Add) OR POST/PUT /profile/faculty (Self Update)
 export const updateOrCreateFacultyProfile = async (req, res) => {
     try {
-        // FIX: Use req.user?._id for self-update, otherwise use placeholder for Admin creation
-        // Note: For Admin POST, we use the ANONYMOUS_ID placeholder.
-        const userId = req.user ? req.user._id : ANONYMOUS_ID; 
+        const userId = req.user._id;
         const facultyData = req.body;
         
-        let faculty;
-        let isNew = true;
-
-        if (req.user) {
-            // If authenticated, we check for an existing profile linked to the user.
-            faculty = await FacultyModel.findOne({ user: userId });
-            isNew = !faculty;
-        } 
-        
-        // If we are adding via Admin (req.user is undefined), we force creation logic.
-        if (!req.user && facultyData.facultyId) {
-             // If Admin is posting, check if the Faculty ID already exists as a profile
-             const existing = await FacultyModel.findOne({ facultyId: facultyData.facultyId });
-             if(existing) {
-                // If the Admin POSTs a profile that already exists, treat it as an unauthorized duplicate POST.
-                 return res.status(400).json({ message: `Faculty profile with ID ${facultyData.facultyId} already exists.` });
-             }
-        }
+        let faculty = await FacultyModel.findOne({ user: userId });
+        let isNew = !faculty;
         
         const dataToSave = {
             ...facultyData,
-            user: userId, // Link to the placeholder ID
+            user: userId,
             profilestatus: true, 
         };
         
         if (isNew) {
-            // CREATE NEW PROFILE (Happens during Admin POST or first Faculty self-POST)
             faculty = await FacultyModel.create(dataToSave); 
             return res.status(201).json({ 
                 message: 'Profile created successfully.',
                 faculty: mapFacultyToFlutter(faculty)
             });
         } else {
-            // UPDATE EXISTING PROFILE (Happens during Faculty self-PUT)
             faculty = await FacultyModel.findByIdAndUpdate(
                 faculty._id,
                 dataToSave,
@@ -109,42 +123,31 @@ export const updateOrCreateFacultyProfile = async (req, res) => {
 // STUDENT PROFILE COMPLETION (Auth Required)
 // -----------------------------------------------------------------
 
-export const studentdetail = async (req,res)=>{
-    try{
-       const {enrollmentId,course,DOB,Gender,Year,Nationality,Religion,State} = req.body;
-       const existing = await StudentModel.findOne({user: req.user._id});
-       
-       if(existing){
-        return res.status(400).json({message: "Student profile already exists"});
-       }
 
-        const user = await UserModel.findById(req.user._id);
-        if(!user){
-            return res.status(404).json({message: "User not found"});
+export const getStudentProfileById = async (req, res) => {
+    try {
+        const { userId } = req.params; // Get user ID from URL
+        const student = await StudentModel.findOne({ user: userId });
+        
+        if (!student) {
+            return res.status(404).json({ success: false, message: 'Student profile not found.' });
         }
 
-       const Student = new StudentModel({
-        user: user._id,
-        email: user.email,
-        name: user.name,
-        number : user.number,
-        enrollmentId,
-        course,
-        DOB,
-        Gender,
-        Year,
-        Nationality,
-        Religion,
-        State,
-        profilestatus: true
-       });
-       await Student.save();
+        const profileData = {
+            _id: student._id,
+            name: student.name,
+            email: student.email,
+            phone: student.number,
+            rollNumber: student.enrollmentId,
+            age: student.age,
+            department: student.course,
+        };
 
-       return res.status(201).send({success: true, message: 'Student profile saved',data: Student });
-    }
-    catch(error){
-        console.error("Error saving student detail:", error);
-        res.status(500).json({success: false, error: error.message});
+        return res.status(200).json({ success: true, data: profileData });
+
+    } catch (error) {
+        console.error("Error fetching student profile:", error);
+        return res.status(500).json({ success: false, message: 'Failed to fetch profile' });
     }
 };
 
@@ -202,7 +205,6 @@ export const adminUpdateFaculty = async (req, res) => {
 
 export const getFacultyDashboardData = async (req, res) => {
     try {
-        // Must rely on user ID passed in the query parameter (e.g., ?userId=...)
         const userId = req.query.userId; 
 
         if (!userId) {
@@ -211,25 +213,21 @@ export const getFacultyDashboardData = async (req, res) => {
             });
         }
         
-        // 1. Find the Faculty Profile linked to that userId
         const facultyProfile = await FacultyModel.findOne({ user: userId })
-            .select('_id name department subject facultyId courseTeaching user'); 
+            .select('_id name department subject facultyId courseTeaching user');
         
         if (!facultyProfile) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
         }
         
-        // 2. Fetch Assigned Courses details
         const assignedCourses = await CourseModel.find({ 
             courseCode: { $in: facultyProfile.courseTeaching } 
         }).select('courseCode name');
 
-        // 3. Fetch Class Schedule
         const classSchedule = await ScheduleModel.find({ faculty: facultyProfile._id })
             .populate('course', 'name courseCode') 
             .select('day startTime endTime location course');
 
-        // Map schedule data to match Flutter's expected structure
         const mappedSchedule = classSchedule.map(schedule => ({
             day: schedule.day,
             time: `${schedule.startTime} - ${schedule.endTime}`,

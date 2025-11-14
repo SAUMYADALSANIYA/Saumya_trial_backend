@@ -7,6 +7,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import dashboardroutes from "./routes/dashboardroutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js"; // <--- NEW IMPORT
 
 dotenv.config();
 //database connection
@@ -17,14 +18,20 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
+// CRITICAL: Makes files in the 'uploads' directory publicly accessible via the '/uploads' URL path.
+app.use('/uploads', express.static('uploads')); 
+
 // -------------------------------------------------------------
-// CORRECT ROUTE MOUNTING
+// ROUTE MOUNTING
 // -------------------------------------------------------------
+
+// DOCUMENTS: /api/v1/documents
+app.use("/api/v1/documents", documentRoutes); // <--- NEW ROUTE MOUNTING
 
 // AUTH: /api/v1/auth
 app.use("/api/v1/auth", authRoutes);
 
-// DASHBOARD: Mounted correctly under /api/v1/dashboard (The Fix)
+// DASHBOARD: /api/v1/dashboard
 app.use("/api/v1/dashboard", dashboardroutes);
 
 // PROFILE: /api/v1/profile
