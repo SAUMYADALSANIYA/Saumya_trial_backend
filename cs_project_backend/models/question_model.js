@@ -17,6 +17,12 @@ const questionSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  // ADD THIS NEW FIELD
+  questionImage: {
+    type: String, // Will store the path, e.g., /uploads/questions/image.png
+    required: false,
+    default: null,
+  },
   source: {
     type: String,
     enum: ['PYQ', 'Book', 'Practice'],

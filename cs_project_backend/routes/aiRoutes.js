@@ -1,16 +1,18 @@
 import express from "express";
 import { verifyToken, permitRoles } from "../middleware/authmiddleware.js";
 import { addQuestion, analyzeSubject, getAnswer } from "../controllers/aiController.js";
+// 1. IMPORT THE NEW MIDDLEWARE
+import { uploadQuestionImage } from '../middleware/questionUploadMiddleware.js';
 
 const router = express.Router();
 
 // --- ADMIN ROUTE ---
-// Use this route to add questions to your database
-// Protected: Only Admins (role 2) can add questions
+// 2. MODIFY THIS ROUTE
 router.post(
   "/add-question",
   verifyToken,
   permitRoles(2), // Only Admins
+  uploadQuestionImage, // Use multer to handle the optional image file
   addQuestion
 );
 

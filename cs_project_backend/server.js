@@ -7,8 +7,8 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import dashboardroutes from "./routes/dashboardroutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
-import documentRoutes from "./routes/documentRoutes.js"; // <--- NEW IMPORT
-import aiRoutes from "./routes/aiRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js"; // <--- 1. IMPORT THE NEW ROUTE
 
 dotenv.config();
 //database connection
@@ -21,13 +21,18 @@ app.use(morgan("dev"));
 
 // CRITICAL: Makes files in the 'uploads' directory publicly accessible via the '/uploads' URL path.
 app.use('/uploads', express.static('uploads')); 
+// ADD THIS LINE: Makes question images public
+app.use('/uploads/questions', express.static('uploads/questions')); 
 
 // -------------------------------------------------------------
 // ROUTE MOUNTING
 // -------------------------------------------------------------
-app.use("/api/v1/ai", aiRoutes);
+
+// AI ROUTES: /api/v1/ai
+app.use("/api/v1/ai", aiRoutes); // <--- 2. MOUNT THE NEW ROUTE
+
 // DOCUMENTS: /api/v1/documents
-app.use("/api/v1/documents", documentRoutes); // <--- NEW ROUTE MOUNTING
+app.use("/api/v1/documents", documentRoutes); 
 
 // AUTH: /api/v1/auth
 app.use("/api/v1/auth", authRoutes);

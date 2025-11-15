@@ -16,9 +16,16 @@ export const uploadDocument = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded.' });
         }
 
-        // Get optional metadata from the request body
-        // NOTE: req.body holds non-file fields from the multipart form
-        const { title, category, audience } = req.body;
+        // Get metadata from the request body
+        // MODIFIED: Changed 'category' to 'type' to match your model
+        const { title, type, audience } = req.body;
+        
+        // ADDED: Validation to ensure the required 'type' field is provided
+        if (!type || !['College', 'Hostel'].includes(type)) {
+            return res.status(400).json({
+                message: "A 'type' field is required. Must be either 'College' or 'Hostel'."
+            });
+        }
         
         // Construct the relative file URL
         const fileUrl = getFileRelativePath(req.file.filename);
@@ -27,7 +34,7 @@ export const uploadDocument = async (req, res) => {
         const newDocument = await DocumentModel.create({
             title: title || req.file.originalname,
             fileUrl: fileUrl,
-            category: category,
+            type: type, // MODIFIED: Correctly saving the 'type'
             audience: audience,
             uploadedBy: req.user ? req.user._id : null, 
         });
@@ -48,15 +55,33 @@ export const uploadDocument = async (req, res) => {
 
 
 // -------------------------------------------------------------
-// GET: Fetch Document List (Used by Student/Faculty/Admin)
+// GET: Fetch Document List BY TYPE (Used by Student/Faculty/Admin)
 // -------------------------------------------------------------
-export const getDocuments = async (req, res) => {
+// RENAMED: from getDocuments to getDocumentsByType
+export const getDocumentsByType = async (req, res) => {
     try {
-        // Logic to filter documents based on user role would go here
-        // For now, we fetch all public documents or all documents (for simplified testing)
-        const documents = await DocumentModel.find()
+        const { type } = req.params; // Get type from URL ('College' or 'Hostel')
+
+        // Validate the type
+        // Capitalize first letter to match enum 'College' or 'Hostel'
+        const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+
+        if (!capitalizedType || !['College', 'Hostel'].includes(capitalizedType)) {
+            return res.status(400).json({ 
+                message: "Invalid document type. Must be 'College' or 'Hostel'." 
+            });
+        }
+
+        // Use the capitalized 'type' in the find query
+        const documents = await DocumentModel.find({ type: capitalizedType })
             .sort({ createdAt: -1 })
-            .select('title fileUrl category audience createdAt');
+            .select('title fileUrl type audience createdAt'); // Added 'type' to the selection
+
+        if (documents.length === 0) {
+             return res.status(404).json({ 
+                message: `No documents found for type: ${capitalizedType}` 
+            });
+        }
 
         res.status(200).json(documents);
 
