@@ -8,6 +8,7 @@ import authRoutes from "./routes/authRoutes.js";
 import dashboardroutes from "./routes/dashboardroutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js"; // <--- NEW IMPORT
+import aiRoutes from "./routes/aiRoutes.js";
 
 dotenv.config();
 //database connection
@@ -24,7 +25,7 @@ app.use('/uploads', express.static('uploads'));
 // -------------------------------------------------------------
 // ROUTE MOUNTING
 // -------------------------------------------------------------
-
+app.use("/api/v1/ai", aiRoutes);
 // DOCUMENTS: /api/v1/documents
 app.use("/api/v1/documents", documentRoutes); // <--- NEW ROUTE MOUNTING
 
