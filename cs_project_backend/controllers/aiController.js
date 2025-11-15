@@ -4,7 +4,13 @@ import fs from 'fs';
 import path from 'path'; 
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
-const API_KEY = "AIzaSyC3JbaT5D5JkHIootEcNSBF4PC6YcWvi8Q"; // Handled by environment
+
+// -----------------------------------------------------------
+// IMPORTANT: PASTE YOUR API KEY HERE
+// -----------------------------------------------------------
+const API_KEY = "AIzaSyC3JbaT5D5JkHIootEcNSBF4PC6YcWvi8Q"; 
+// -----------------------------------------------------------
+
 
 // --- Helper function to get relative file path ---
 const getFileRelativePath = (filename) => `/uploads/questions/${filename}`;
@@ -21,6 +27,8 @@ async function callGemini(payload) {
 
   if (!response.ok) {
     const errorBody = await response.text();
+    // Log the detailed error for debugging
+    console.error("Gemini API Error Body:", errorBody); 
     throw new Error(`API call failed with status ${response.status}: ${errorBody}`);
   }
 
@@ -82,6 +90,9 @@ export const analyzeSubject = async (req, res) => {
         imagePath: q.questionImage 
       }))
     );
+
+    // 3. Define the precise JSON output structure
+    //    *** THIS BLOCK IS NOW FIXED ***
     const jsonSchema = {
       type: "OBJECT",
       properties: {
@@ -93,23 +104,34 @@ export const analyzeSubject = async (req, res) => {
             properties: {
               topic: { type: "STRING" },
               count: { type: "INTEGER" }
-            }
+            },
+            required: ["topic", "count"]
           }
         },
         questionsByTopic: {
           type: "OBJECT",
           description: "An object where each key is a topic name and each value is an array of question objects.",
-          items: {
-            type: "OBJECT",
-            properties: {
-              questionText: { type: "STRING" },
-              questionImage: { type: "STRING", "nullable": true } 
+          
+          // FIX: Use 'additionalProperties' to define a dynamic key-value map
+          // where the VALUE is an ARRAY.
+          additionalProperties: {
+            type: "ARRAY",
+            // 'items' defines what is IN that array
+            items: {
+              type: "OBJECT",
+              properties: {
+                questionText: { type: "STRING" },
+                questionImage: { type: "STRING", "nullable": true }
+              },
+              required: ["questionText"]
             }
           }
         }
       },
       required: ["topicSummary", "questionsByTopic"]
     };
+
+    // 4. Create the system prompt
     const systemPrompt = `You are an expert university professor for the subject "${subject}". Your job is to analyze a list of past exam questions and organize them for a student.
 - You will be given a JSON string array of question objects, each with a "text" and an "imagePath" (which can be null).
 - Read all the questions.
@@ -120,6 +142,7 @@ export const analyzeSubject = async (req, res) => {
 - The 'topicSummary' array must be sorted by 'count' in descending order.
 - In 'questionsByTopic', the value for each topic must be an array of objects, containing the *exact, unmodified* "questionText" and "questionImage" values from the input.`;
 
+    // 5. Call the Gemini API with the JSON schema
     const payload = {
       systemInstruction: {
         parts: [{ text: systemPrompt }]
@@ -132,10 +155,16 @@ export const analyzeSubject = async (req, res) => {
         responseSchema: jsonSchema
       }
     };
+    
     const result = await callGemini(payload);
+    
+    // 6. Parse the JSON text from the API's response
     const jsonText = result.candidates[0].content.parts[0].text;
     const structuredData = JSON.parse(jsonText);
+
+    // 7. Send the structured JSON to the Flutter app
     res.status(200).json(structuredData);
+
   } catch (error) {
     console.error("Error analyzing subject:", error);
     res.status(500).json({ message: "Error analyzing subject", error: error.message });
@@ -199,22 +228,18 @@ Be thorough and helpful.`;
 // -------------------------------------------------------------
 export const batchAddQuestions = async (req, res) => {
   try {
-    // Expects a JSON array in the body:
-    // [ { "subject": "...", "year": 2023, "questionText": "..." }, ... ]
     const questions = req.body; 
 
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ message: "Request body must be a non-empty array of questions." });
     }
 
-    // Add the 'source' and 'questionImage' defaults
     const questionsToInsert = questions.map(q => ({
       ...q,
       questionImage: null,
       source: q.source || 'PYQ'
     }));
 
-    // Use insertMany for efficient batch insertion
     const result = await QuestionModel.insertMany(questionsToInsert);
 
     res.status(201).json({
@@ -238,20 +263,16 @@ export const addQuestionImage = async (req, res) => {
     const { id } = req.params; // Get the Question ID from the URL
     const imageFile = req.file; // Get the uploaded file
 
-    // Check for file validation errors
     if (req.fileValidationError) {
       return res.status(400).json({ message: req.fileValidationError });
     }
 
-    // Check if a file was actually uploaded
     if (!imageFile) {
       return res.status(400).json({ message: "No image file uploaded." });
     }
 
-    // Get the relative path to store in the DB
     const imageUrl = getFileRelativePath(imageFile.filename);
 
-    // Find the question by ID and update its image field
     const updatedQuestion = await QuestionModel.findByIdAndUpdate(
       id,
       { questionImage: imageUrl },
