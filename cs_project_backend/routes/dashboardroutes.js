@@ -1,29 +1,25 @@
 import express from 'express';
-import { verifyToken } from '../middleware/authmiddleware.js';
-import { permitRoles } from '../middleware/authmiddleware.js';
+// Middleware is no longer needed
+// import { verifyToken } from '../middleware/authmiddleware.js';
+// import { permitRoles } from '../middleware/authmiddleware.js';
 import { redirectToDashboard, updateStudent} from '../controllers/dashboardcontroller.js';
 import { deleteStudent } from './../controllers/dashboardcontroller.js';
 import { getStudents } from '../controllers/dashboardcontroller.js';
 
 const router = express.Router();
 
-router.get('/redirect',verifyToken,redirectToDashboard);
+// CHANGED: This is now a POST to accept a userId in the body
+router.post('/redirect', redirectToDashboard);
 
 router.get('/dashboard/student',
-    verifyToken,
-    permitRoles(0),
     (req,res)=> res.json({message: 'Welcome Student'})
 );
 
 router.get('/dashboard/faculty',
-    verifyToken,
-    permitRoles(1),
     (req,res)=> res.json({message: 'Welcome Faculty'})
 );
 
 router.get('/dashboard/admin',
-    verifyToken,
-    permitRoles(2),
     (req,res)=> res.json({message: 'Welcome Admin'})
 );
 

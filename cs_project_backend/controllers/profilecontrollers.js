@@ -18,22 +18,31 @@ const mapFacultyToFlutter = (faculty) => ({
     qualification: faculty.qualification,
 });
 
+// -----------------------------------------------------------------
+// REFACTORED: This function now requires 'userId' in the body
+// -----------------------------------------------------------------
 const studentdetail = async (req,res)=>{
     try{
-       const {enrollmentId,course,DOB,Gender,Year,Nationality,Religion,State} = req.body;
-       const existing = await student_model.findOne({user: req.user._id});
+       // 'userId' is now expected in the body
+       const {userId, enrollmentId, course, DOB, Gender, Year, Nationality, Religion, State} = req.body;
+
+       if (!userId) {
+           return res.status(400).json({ message: "userId is required in the body." });
+       }
+
+       const existing = await student_model.findOne({user: userId});
 
        if(existing){
         return res.status(400).json({message: "Student profile already exists"});
        }
 
-        const user = await user_model.findById(req.user._id);
+        const user = await user_model.findById(userId);
         if(!user){
             return res.status(404).json({message: "User not found"});
         }
 
        const Student = new student_model({
-        user: user._id,
+        user: user._id, // Use the userId from the body
         email: user.email,
         name: user.name,
         number : user.number,
@@ -53,7 +62,8 @@ const studentdetail = async (req,res)=>{
 });
     }
     catch(error){
-        res.json({success: false, error});
+        console.error("Error in studentdetail:", error); // Added better logging
+        res.json({success: false, error: error.message });
     }
 };
 
@@ -61,12 +71,16 @@ export default studentdetail;
 
 
 // -----------------------------------------------------------------
-// FACULTY PROFILE MANAGEMENT (Auth Required)
+// REFACTORED: This function now requires 'userId' in the body
 // -----------------------------------------------------------------
-
 export const getMyFacultyProfile = async (req, res) => {
     try {
-        const faculty = await FacultyModel.findOne({ user: req.user._id });
+        const { userId } = req.body; // Get userId from body
+        if (!userId) {
+            return res.status(400).json({ message: "userId is required in the body." });
+        }
+
+        const faculty = await FacultyModel.findOne({ user: userId });
         
         if (!faculty) {
             return res.status(404).json({ message: 'Faculty profile not found.' });
@@ -78,10 +92,16 @@ export const getMyFacultyProfile = async (req, res) => {
     }
 };
 
+// -----------------------------------------------------------------
+// REFACTORED: This function now requires 'userId' in the body
+// -----------------------------------------------------------------
 export const updateOrCreateFacultyProfile = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const facultyData = req.body;
+        const { userId, ...facultyData } = req.body; // Separate userId from the rest
+        
+        if (!userId) {
+            return res.status(400).json({ message: "userId is required in the body." });
+        }
         
         let faculty = await FacultyModel.findOne({ user: userId });
         let isNew = !faculty;
@@ -120,10 +140,8 @@ export const updateOrCreateFacultyProfile = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// STUDENT PROFILE COMPLETION (Auth Required)
+// STUDENT PROFILE (This route was already public)
 // -----------------------------------------------------------------
-
-
 export const getStudentProfileById = async (req, res) => {
     try {
         const { userId } = req.params; // Get user ID from URL
@@ -153,15 +171,13 @@ export const getStudentProfileById = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// ADMIN FACULTY LIST & UPDATE (NO AUTH)
+// ADMIN FACULTY LIST & UPDATE (These were already public)
 // -----------------------------------------------------------------
-
 export const getFaculties = async (req, res) => {
+    // ... (This function is unchanged)
     try {
         const faculties = await FacultyModel.find().select('_id facultyId name subject department');
-        
         const facultyList = faculties.map(f => mapFacultyToFlutter(f));
-
         return res.status(200).json(facultyList); 
     } catch (error) {
         console.error("Error fetching faculties:", error);
@@ -170,6 +186,7 @@ export const getFaculties = async (req, res) => {
 };
 
 export const adminUpdateFaculty = async (req, res) => {
+    // ... (This function is unchanged)
     try {
         const { id } = req.params; 
         const facultyData = req.body; 
@@ -200,19 +217,18 @@ export const adminUpdateFaculty = async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// FACULTY DASHBOARD DATA API (NO AUTH - Requires query param)
+// FACULTY DASHBOARD DATA API (This was already public-facing)
 // -----------------------------------------------------------------
-
 export const getFacultyDashboardData = async (req, res) => {
+    // ... (This function is unchanged)
     try {
         const userId = req.query.userId; 
-
         if (!userId) {
             return res.status(400).json({ 
-                message: "Authentication is disabled. Please provide the target user's Mongoose ID in the query parameter (e.g., ?userId=...).",
+                message: "Please provide the target user's Mongoose ID in the query parameter (e.g., ?userId=...).",
             });
         }
-        
+        // ... (rest of the function is fine)
         const facultyProfile = await FacultyModel.findOne({ user: userId })
             .select('_id name department subject facultyId courseTeaching user');
         

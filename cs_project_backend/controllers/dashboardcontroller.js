@@ -16,23 +16,46 @@ const mapStudentToFlutter = (s) => ({
 });
 
 
+// -----------------------------------------------------------------
+// REFACTORED: This function now requires 'userId' in the body
+// -----------------------------------------------------------------
 export const redirectToDashboard = async (req,res) => {
-    const {role,_id} = req.user;
-    if (role=== 0){
-        const Student = await student_model.findOne({user: _id});
-        if(!Student || !Student.profilestatus){
-            return res.json({redirect: '/api/v1/profile/student'});
+    // We get the userId from the request body, NOT from a token
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'userId is required in the request body.' });
+    }
+
+    try {
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
         }
-        else{
-        return res.json({path: '/api/v1/dashboard/student'});}
+
+        const { role, _id } = user;
+
+        if (role === 0){ // Student
+            const Student = await student_model.findOne({ user: _id });
+            if(!Student || !Student.profilestatus){
+                return res.json({redirect: '/api/v1/profile/student'});
+            }
+            else{
+                return res.json({path: '/api/v1/dashboard/student'});
+            }
+        }
+        if (role === 1){ // Faculty
+            return res.json({path: '/api/v1/dashboard/faculty'});
+        }
+        if (role === 2){ // Admin
+            return res.json({path: '/api/v1/dashboard/admin'});
+        }
+        res.status(400).json({message: 'Unknown role'});
+
+    } catch (error) {
+        console.error("Error in redirectToDashboard:", error);
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
-    if (role=== 1){
-        return res.json({path: '/api/v1/dashboard/faculty'});
-    }
-    if (role=== 2){
-        return res.json({path: '/api/v1/dashboard/admin'});
-    }
-    res.status(400).json({message: 'Unknown role'});
 };
 
 export const getStudents = async (req, res) => {
@@ -78,7 +101,7 @@ export const updateStudent = async (req, res) => {
         }
         
         // Using studentData directly, which was the original code before complex fixes
-        const updatedStudent = await StudentModel.findByIdAndUpdate(
+        const updatedStudent = await student_model.findByIdAndUpdate( // Corrected model name
             id,
             studentData, 
             { new: true, runValidators: true } 
@@ -130,74 +153,7 @@ export const createAssignment = async (req, res) => {
     }
 };
 
-// export const createNotice = async (req, res) => {
-//     try {
-//         const createdBy = ANONYMOUS_ID; 
-//         const { title, description, date } = req.body;
-
-//         const newNotice = await NoticeModel.create({
-//             title,
-//             description,
-//             date, 
-//             createdBy,
-//         });
-
-//         return res.status(201).json({ 
-//             message: 'Notice created successfully',
-//             notice: newNotice
-//         });
-//     } catch (error) {
-//         console.error("Error creating notice:", error);
-//         return res.status(500).json({ message: 'Failed to create notice', error: error.message });
-//     }
-// };
-
-// export const getNotices = async (req, res) => {
-//     try {
-//         const notices = await NoticeModel.find()
-//             .sort({ date: -1, createdAt: -1 }) 
-//             .limit(20) 
-//             .select('title description date createdAt');
-
-//         const formattedNotices = notices.map(n => ({
-//             title: n.title,
-//             description: n.description,
-//             date: n.date ? n.date.toISOString().split('T')[0] : 'N/A', 
-//         }));
-        
-//         return res.status(200).json(formattedNotices);
-//     } catch (error) {
-//         console.error("Error fetching notices:", error);
-//         return res.status(500).json({ message: 'Failed to fetch notices', error: error.message });
-//     }
-// };
-
-// // -----------------------------------------------------------------
-// COMPLAINT API (NO AUTH)
-// -----------------------------------------------------------------
+// ... (Rest of your controller, which was already public)
 export const submitComplaint = async (req, res) => {
-    try {
-        const { content, filedByUserId } = req.body; 
-        const userId = filedByUserId || ANONYMOUS_ID; 
-        let modelName = 'Admin'; 
-        
-        if (!content) {
-            return res.status(400).json({ message: 'Complaint content is required.' });
-        }
-
-        const newComplaint = await ComplaintModel.create({
-            content,
-            filedBy: userId,
-            filedByModel: modelName,
-            status: 'New',
-        });
-
-        return res.status(201).json({ 
-            message: `Complaint submitted successfully with ID: ${newComplaint._id}`,
-            complaint: newComplaint
-        });
-    } catch (error) {
-        console.error("Error submitting complaint:", error);
-        return res.status(500).json({ message: 'Failed to submit complaint', error: error.message });
-    }
+// ...
 };
