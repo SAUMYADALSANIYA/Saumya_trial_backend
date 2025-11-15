@@ -1,3 +1,4 @@
+import fetch from 'node-fetch';
 import QuestionModel from '../models/question_model.js';
 
 // This is the Gemini API URL.
