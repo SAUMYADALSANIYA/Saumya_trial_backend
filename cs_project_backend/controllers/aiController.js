@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path'; 
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
-const API_KEY = ""; // Handled by environment
+const API_KEY = "AIzaSyC3JbaT5D5JkHIootEcNSBF4PC6YcWvi8Q"; // Handled by environment
 
 // --- Helper function to get relative file path ---
 const getFileRelativePath = (filename) => `/uploads/questions/${filename}`;
