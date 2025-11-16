@@ -82,6 +82,8 @@ export const analyzeSubject = async (req, res) => {
         imagePath: q.questionImage 
       }))
     );
+    // -------------------------------------------------------------------
+    // Use an explicit array-based schema so the API doesn't require dynamic OBJECT properties.
     const jsonSchema = {
       type: "OBJECT",
       properties: {
@@ -93,28 +95,38 @@ export const analyzeSubject = async (req, res) => {
             properties: {
               topic: { type: "STRING" },
               count: { type: "INTEGER" }
-            }
+            },
+            required: ["topic", "count"]
           }
         },
-        // --- THIS IS THE CORRECTED BLOCK ---
-        questionsByTopic: {
-          type: "OBJECT",
-          description: "An object where each key is a topic name and each value is an array of question objects.",
-          additionalProperties: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                questionText: { type: "STRING" },
-                questionImage: { type: "STRING", "nullable": true } 
+        // 'topics' is an array where each item groups a topic name with its questions.
+        topics: {
+          type: "ARRAY",
+          description: "Array of topic groups. Each item has 'topic' and 'questions' (array of question objects).",
+          items: {
+            type: "OBJECT",
+            properties: {
+              topic: { type: "STRING" },
+              questions: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    questionText: { type: "STRING" },
+                    questionImage: { type: "STRING" }
+                  },
+                  required: ["questionText"]
+                }
               }
-            }
+            },
+            required: ["topic", "questions"]
           }
         }
-        // --- END OF CORRECTION ---
       },
-      required: ["topicSummary", "questionsByTopic"]
+      required: ["topicSummary", "topics"]
     };
+    // -------------------------------------------------------------------
+    
     const systemPrompt = `You are an expert university professor for the subject "${subject}". Your job is to analyze a list of past exam questions and organize them for a student.
 - You will be given a JSON string array of question objects, each with a "text" and an "imagePath" (which can be null).
 - Read all the questions.
@@ -123,7 +135,8 @@ export const analyzeSubject = async (req, res) => {
 - Count how many questions fall into each topic.
 - Return a JSON object that strictly follows the provided schema.
 - The 'topicSummary' array must be sorted by 'count' in descending order.
-- In 'questionsByTopic', the value for each topic must be an array of objects, containing the *exact, unmodified* "questionText" and "questionImage" values from the input.`;
+- Instead of a dynamic object map, return a 'topics' array where each item is { "topic": "<name>", "questions": [ { "questionText": "...", "questionImage": "..." }, ... ] }.
+- Ensure 'questionText' and 'questionImage' values are the exact unmodified values from the input.`;
 
     const payload = {
       systemInstruction: {
